@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8' />
+<link href='packages/core/main.css' rel='stylesheet' />
+<link href='packages/daygrid/main.css' rel='stylesheet' />
+<link href='packages/timegrid/main.css' rel='stylesheet' />
+<link href='packages/list/main.css' rel='stylesheet' />
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<script src='packages/core/main.js'></script>
+<script src='packages/interaction/main.js'></script>
+<script src='packages/daygrid/main.js'></script>
+<script src='packages/timegrid/main.js'></script>
+<script src='packages/moment/main.js'></script>
+<script src='packages/list/main.js'></script>
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+<script>
+
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('dialog').style.display='none';
+  var calendarEl = document.getElementById('calendar');
+  var calendar = new FullCalendar.Calendar(calendarEl, {
+    plugins: [ 'interaction', 'dayGrid','list' ],
+    selectable: true,
+    displayEventTime: false,
+    header: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+    },
+    select: function(info) {
+      $('#start-at').datepicker(
+        { dateFormat: "yy-mm-dd" }
+      );
+      $('#ends-at').datepicker(
+        { dateFormat: "yy-mm-dd" }
+      );
+      $("#start-at").val($.datepicker.formatDate("yy-mm-dd", info.start));
+      $("#dialog").dialog({
+          title: 'Event Details',
+          height: 360,
+          width: 350,
+          modal: true,
+          buttons: {
+            'Close': function() {
+              $('#event-detail').removeClass("ui-state-error");
+              $('#dialog').dialog('close');
+            },
+            'Save': function() {
+              $('#event-detail').removeClass("ui-state-error");
+              $('#start-at').removeClass("ui-state-error");
+              var valid = true;
+              var endDate;
+              valid = valid && checkNull($('#event-detail'), 'Event');
+              valid = valid && checkNull($('#start-at'), 'Event');
+              endDate = $('#ends-at').val().length > 0 ? $('#ends-at').val() : $('#start-at').val()
+              endDate = endDate + " 01:00:00";
+              if (valid){
+                $('#dialog').dialog('close');
+                calendar.addEvent({
+                  title: $('#event-detail').val(),
+                  start: $('#start-at').val(),
+                  end: endDate,
+                });
+                $.ajax({
+                  url:"php/insert.php",
+                  type:"POST",
+                  data:{title:$('#event-detail').val(), start:$('#start-at').val(), end:endDate},
+                  success:function(){
+                   console.log('event inserted successfully');
+                  }
+                })
+              }
+            }
+          }
+      });
+    },
+    // defaultDate: '2019-06-10',
+    allDay: true,
+    editable: true,
+    navLinks: true, // can click day/week names to navigate views
+    eventLimit: true, // allow "more" link when too many events
+    events: {
+      url: 'php/get-events-db.php',
+      failure: function() {
+        document.getElementById('script-warning').style.display = 'block'
+      }
+    },
+    loading: function(bool) {
+      document.getElementById('loading').style.display =
+        bool ? 'block' : 'none';
+    },
+    eventClick: function(info) {
+      var editEvent = calendar.getEventById($('#event-id').val());
+      $('#start-at').datepicker(
+        { dateFormat: "yy-mm-dd" }
+      );
+      $('#ends-at').datepicker(
+        { dateFormat: "yy-mm-dd" }
+      );
+       $("#dialog").dialog({
+          title: 'Event Details',
+          height: 360,
+          width: 350,
+          modal: true,
+          buttons: {
+            'Close': function() {
+              $('#event-detail').removeClass("ui-state-error");
+              $('#dialog').dialog('close');
+            },
+            'Save': function() {
+              $('#event-detail').removeClass("ui-state-error");
+              $('#start-at').removeClass("ui-state-error");
+              editEvent = calendar.getEventById($('#event-id').val());
+              var valid = true;
+              var endDate;
+              valid = valid && checkNull($('#event-detail'), 'Event');
+              valid = valid && checkNull($('#start-at'), 'Event');
+              if (valid){
+                editEvent.setProp('title', $('#event-detail').val() );
+                editEvent.setStart($('#start-at').val());
+                endDate = $('#ends-at').val().length > 0 ? $('#ends-at').val() : $('#start-at').val()
+                editEvent.setEnd(endDate + " 01:00:00")
+                $('#dialog').dialog('close');
+                //save into DB
+                $.ajax({
+                  url:"php/update.php",
+                  type:"POST",
+                  data:{title:$('#event-detail').val(), start:$('#start-at').val(), end:endDate, id:editEvent.id},
+                  success:function(){
+                   console.log('event updated successfully');
+                  }
+                })
+              }
+            },
+            'Remove':function() {
+              editEvent = calendar.getEventById($('#event-id').val());
+              editEvent.remove();
+              //Now remove from DB
+              $('#dialog').dialog('close');
+              $.ajax({
+                  url:"php/delete.php",
+                  type:"POST",
+                  data:{ id:editEvent.id },
+                  success:function(){
+                   console.log('event deleted successfully');
+                  }
+              })  
+            }
+          }
+       });
+       $("#event-detail").val(info.event.title);
+       $("#event-id").val(info.event.id);
+       $("#start-at").val($.datepicker.formatDate("yy-mm-dd", info.event.start));
+       $("#ends-at").val($.datepicker.formatDate("yy-mm-dd", info.event.end));
+   },
+   eventDrop: function(info) {
+     // alert(info.event.title + " was dropped on " + info.event.start.toISOString());
+     var startDtfmted=$.datepicker.formatDate("yy-mm-dd", info.event.start);
+     endDate = info.event.end > 0 ? info.event.end : info.event.start;
+     var endDtfmted=$.datepicker.formatDate("yy-mm-dd", endDate);
+     console.log(endDtfmted);
+     $.ajax({
+       url:"php/update.php",
+       type:"POST",
+       data:{title:info.event.title, start:startDtfmted, end:endDtfmted, id:info.event.id},
+       success:function(){
+        console.log('event updated successfully');
+       }
+     })
+   },
+   eventResize: function(info) {
+     // alert(info.event.title + " was dropped on " + info.event.start.toISOString());
+     var startDtfmted=$.datepicker.formatDate("yy-mm-dd", info.event.start);
+     endDate = $('#ends-at').val().length > 0 ? $('#ends-at').val() : $('#start-at').val();
+     var endDtfmted=$.datepicker.formatDate("yy-mm-dd", endDate);
+     console.log(endDtfmted);
+     $.ajax({
+       url:"php/update.php",
+       type:"POST",
+       data:{title:info.event.title, start:startDtfmted, end:endDtfmted, id:info.event.id},
+       success:function(){
+        console.log('event updated successfully');
+       }
+     })
+   }
+  });
+
+  calendar.render();
+});
+
+function checkNull( o, n ) {
+  console.log('in checkNull');
+      if ( o.val().length <= 0 ) {
+        o.addClass( "ui-state-error" );
+        // updateTips( n + " must not be blank. " );
+        return false;
+      } else {
+        return true;
+      }
+}
+
+function updateTips( t ) {
+      var tips = $( ".validateTips" );
+      tips
+        .text( t )
+        .addClass( "ui-state-highlight" );
+      setTimeout(function() {
+        tips.removeClass( "ui-state-highlight", 1500 );
+      }, 500 );
+}
+
+</script>
+
+<style>
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica Neue, Helvetica, sans-serif;
+    font-size: 14px;
+  }
+
+  #script-warning {
+    display: none;
+    background: #eee;
+    border-bottom: 1px solid #ddd;
+    padding: 0 10px;
+    line-height: 40px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 12px;
+    color: red;
+  }
+
+  #loading {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+
+  #calendar {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 10px;
+  }
+
+    label, input { display:block; }
+    input.text { margin-bottom:12px; width:95%; padding: .4em; }
+    fieldset { padding:0; border:0; margin-top:25px; }
+    h1 { font-size: 1.2em; margin: .6em 0; }
+    div#users-contain { width: 350px; margin: 20px 0; }
+    div#users-contain table { margin: 1em 0; border-collapse: collapse; width: 100%; }
+    div#users-contain table td, div#users-contain table th { border: 1px solid #eee; padding: .6em 10px; text-align: left; }
+    .ui-dialog .ui-state-error { padding: .3em; }
+    .validateTips { border: 1px solid transparent; padding: 0.3em; display:=none;}
+
+</style>
+</head>
+<body>
+
+  <div id='script-warning'>
+    <code>php/get-events.php</code> must be running.
+  </div>
+
+  <div id='loading'>loading...</div>
+
+  <div id='calendar'></div>
+
+  <div id="dialog">
+  <p class="validateTips" id="validateTips"> Event and Start Date must not be blank </p>
+      <form>
+        <fieldset>
+              <label for="event-detail">Event:</label>
+              <input name="event-detail" id="event-detail" type="text" class="text ui-widget-content ui-corner-all">
+              <label for="start-at">Start:</label>
+              <input name="start-at" id="start-at" class="text ui-widget-content ui-corner-all">
+              <input name="event-id" id="event-id" type="hidden">
+              <label for="ends-at">End:</label>
+              <input name="ends-at" id="ends-at" class="text ui-widget-content ui-corner-all">
+        </fieldset>
+      </form>
+  </div>
+
+</body>
+</html>
