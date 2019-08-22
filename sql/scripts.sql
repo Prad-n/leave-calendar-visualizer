@@ -1,8 +1,8 @@
 create table events2 (
   id int auto_increment primary key,
   title varchar(50),
-  start date,
-  end date
+  start datetime,
+  end datetime
 );
 
 

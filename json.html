@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', function() {
         { dateFormat: "yy-mm-dd" }
       );
       $("#start-at").val($.datepicker.formatDate("yy-mm-dd", info.start));
+      $('#event-detail,#ends-at').each( function(){
+          $(this).val(''); 
+      });
       $("#dialog").dialog({
           title: 'Event Details',
           height: 360,
@@ -139,6 +142,9 @@ document.addEventListener('DOMContentLoaded', function() {
               editEvent.remove();
               //Now remove from DB
               $('#dialog').dialog('close');
+              $('#event-detail,#start-at,#ends-at').each( function(){
+                 $(this).val(''); 
+              });
               $.ajax({
                   url:"php/delete.php",
                   type:"POST",
